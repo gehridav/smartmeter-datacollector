@@ -74,7 +74,8 @@ class MeterDataPointTypes(Enum):
     POWER_FACTOR = MeterDataPointType("POWER_FACTOR", "Power Factor", "")
     NET_FREQUENCY = MeterDataPointType("NET_FREQUENCY", "Net Frequency any Phase", "Hz")
 
-    WATER = MeterDataPointType("WATER", "Water consumption", "m3")
+    WATER = MeterDataPointType("WATER", "Accumulated volume", "m3")
+
 
 @dataclass
 class MeterDataPoint:
