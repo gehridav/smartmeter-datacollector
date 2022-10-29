@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from gurux_dlms import GXDateTime
-from gurux_dlms.objects import GXDLMSClock, GXDLMSData
+from gurux_dlms.objects import GXDLMSClock, GXDLMSData, GXDLMSMBusClient
 
 from .meter_data import MeterDataPointType
 
@@ -24,7 +24,8 @@ OBIS_DEFAULT_IDS = [
     "0.0.96.2.0.255",
     "0.0.96.3.0.255",
     "0.0.96.4.0.255",
-    "0.0.96.5.0.255"
+    "0.0.96.5.0.255",
+    "0.1.24.1.0.255"
 ]
 OBIS_DEFAULT_CLOCK = "0.0.1.0.0.255"
 COSEM_OBJECT_DETECT_ATTEMPTS = 3
@@ -58,12 +59,17 @@ class Cosem:
             return self._fallback_id
 
         id_obj = dlms_objects[id_obis]
-        if not isinstance(id_obj, GXDLMSData):
-            LOGGER.debug("Invalid ID object for OBIS code %s. Using fallback ID %s.", id_obis, self._fallback_id)
-            self._trigger_id_detect_counter()
-            return self._fallback_id
 
-        meter_id = id_obj.getValues()[1]
+        if not isinstance(id_obj, GXDLMSData):
+            if isinstance(id_obj, GXDLMSMBusClient):
+                meter_id = str(id_obj.getValues()[5])
+            else:
+                LOGGER.debug("Invalid ID object for OBIS code %s. Using fallback ID %s.", id_obis, self._fallback_id)
+                self._trigger_id_detect_counter()
+                return self._fallback_id
+        else:
+            meter_id = id_obj.getValues()[1]
+
         if not isinstance(meter_id, str) or len(meter_id) == 0:
             LOGGER.debug("Invalid ID for OBIS code %s. Using fallback ID %s.", id_obis, self._fallback_id)
             self._trigger_id_detect_counter()

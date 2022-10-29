@@ -67,6 +67,14 @@ class TestDlmsParserUnencrypted:
             parser.extract_data_from_hdlc_frames()
         return parser
 
+    @pytest.fixture
+    def valid_hdlc_extended_register_buffer(self, cosem_config_lg, unencrypted_valid_data_extended_register_lg) -> HdlcDlmsParser:
+        parser = HdlcDlmsParser(cosem_config_lg)
+        for frame in unencrypted_valid_data_extended_register_lg:
+            parser.append_to_hdlc_buffer(frame)
+            parser.extract_data_from_hdlc_frames()
+        return parser
+
     def test_parse_hdlc_to_dlms_objects(self, valid_hdlc_buffer: HdlcDlmsParser):
         dlms_objects = valid_hdlc_buffer.parse_to_dlms_objects()
 
@@ -88,6 +96,16 @@ class TestDlmsParserUnencrypted:
         assert all(isinstance(data.value, float) for data in meter_data)
         assert all(data.source == "LGZ1030655933512" for data in meter_data)
         assert all(data.timestamp.strftime(r"%m/%d/%y %H:%M:%S") == "07/06/21 14:58:18" for data in meter_data)
+
+    def test_parse_dlms_extended_register_to_meter_data(self, valid_hdlc_extended_register_buffer: HdlcDlmsParser):
+        dlms_objects = valid_hdlc_extended_register_buffer.parse_to_dlms_objects()
+        meter_data = valid_hdlc_extended_register_buffer.convert_dlms_bundle_to_reader_data(dlms_objects)
+        assert isinstance(meter_data, list)
+        assert len(meter_data) == 1
+        assert any(data.type == MeterDataPointTypes.WATER.value for data in meter_data)
+        assert all(isinstance(data.value, float) for data in meter_data)
+        assert all(data.source == "21538333" for data in meter_data)
+        #assert all(data.timestamp.strftime(r"%m/%d/%y %H:%M:%S") == "28/10/22 19:25:59" for data in meter_data)
 
     def test_parse_not_parsable_data_to_meter_data(self, invalid_hdlc_buffer: HdlcDlmsParser):
         dlms_objects = invalid_hdlc_buffer.parse_to_dlms_objects()

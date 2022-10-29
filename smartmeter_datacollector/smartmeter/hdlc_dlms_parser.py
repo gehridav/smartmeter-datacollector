@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from gurux_dlms import GXByteBuffer, GXDLMSClient, GXReplyData
 from gurux_dlms.enums import InterfaceType, ObjectType, Security
-from gurux_dlms.objects import GXDLMSData, GXDLMSObject, GXDLMSRegister
+from gurux_dlms.objects import GXDLMSData, GXDLMSObject, GXDLMSRegister, GXDLMSExtendedRegister
 from gurux_dlms.secure import GXDLMSSecureClient
 
 from .cosem import Cosem
@@ -97,16 +97,17 @@ class HdlcDlmsParser:
 
         # Extract register data
         data_points: List[MeterDataPoint] = []
-        for obis, obj in filter(lambda o: o[1].getObjectType() == ObjectType.REGISTER, dlms_objects.items()):
+        for obis, obj in filter(lambda o: (o[1].getObjectType() ==  ObjectType.REGISTER) or (o[1].getObjectType() == ObjectType.EXTENDED_REGISTER), dlms_objects.items()):
             reg_type = self._cosem.get_register(obis)
-            if reg_type and isinstance(obj, GXDLMSRegister):
+            if reg_type and (isinstance(obj, GXDLMSRegister) or isinstance(obj, GXDLMSExtendedRegister)):
                 raw_value = self._extract_register_value(obj)
+                raw_scaler = self._extract_register_scaler(obj)
                 if raw_value is None:
                     LOGGER.warning("No value received for %s.", obis)
                     continue
                 data_point_type = reg_type.data_point_type
                 try:
-                    value = float(raw_value) * reg_type.scaling
+                    value = float(raw_value) * reg_type.scaling * raw_scaler
                 except (TypeError, ValueError, OverflowError):
                     LOGGER.warning("Invalid register value '%s'. Skipping register.", str(raw_value))
                     continue
@@ -120,3 +121,7 @@ class HdlcDlmsParser:
     @staticmethod
     def _extract_register_value(register: GXDLMSRegister) -> Optional[Any]:
         return register.getValues()[1]
+
+    @staticmethod
+    def _extract_register_scaler(register: GXDLMSRegister) -> Optional[Any]:
+        return register.getValues()[2][0]

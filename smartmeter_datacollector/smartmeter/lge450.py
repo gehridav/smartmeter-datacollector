@@ -80,6 +80,8 @@ LGE450_COSEM_REGISTERS = [
     RegisterCosem("1.1.6.8.0.255", MeterDataPointTypes.REACTIVE_ENERGY_Q2.value),
     RegisterCosem("1.1.7.8.0.255", MeterDataPointTypes.REACTIVE_ENERGY_Q3.value),
     RegisterCosem("1.1.8.8.0.255", MeterDataPointTypes.REACTIVE_ENERGY_Q4.value),
+
+    RegisterCosem("0.1.24.2.1.255", MeterDataPointTypes.WATER.value),
 ]
 
 
