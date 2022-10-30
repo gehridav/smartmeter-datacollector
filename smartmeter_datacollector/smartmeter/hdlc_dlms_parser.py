@@ -102,13 +102,12 @@ class HdlcDlmsParser:
             reg_type = self._cosem.get_register(obis)
             if reg_type and (isinstance(obj, (GXDLMSRegister, GXDLMSExtendedRegister))):
                 raw_value = self._extract_register_value(obj)
-                raw_scaler = self._extract_register_scaler(obj)
                 if raw_value is None:
                     LOGGER.warning("No value received for %s.", obis)
                     continue
                 data_point_type = reg_type.data_point_type
                 try:
-                    value = float(raw_value) * reg_type.scaling * raw_scaler
+                    value = float(raw_value) * reg_type.scaling
                 except (TypeError, ValueError, OverflowError):
                     LOGGER.warning("Invalid register value '%s'. Skipping register.", str(raw_value))
                     continue
@@ -122,7 +121,3 @@ class HdlcDlmsParser:
     @staticmethod
     def _extract_register_value(register: GXDLMSRegister) -> Optional[Any]:
         return register.getValues()[1]
-
-    @staticmethod
-    def _extract_register_scaler(register: GXDLMSRegister) -> Optional[Any]:
-        return register.getValues()[2][0]
