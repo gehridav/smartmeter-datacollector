@@ -82,7 +82,6 @@ class HdlcDlmsParser:
         if isinstance(self._dlms_data.value, list):
             #pylint: disable=unsubscriptable-object
             parsed_objects = self._client.parsePushObjects(self._dlms_data.value[0])
-           
             value_objects = {}
             for index, (obj, attr_ind) in enumerate(parsed_objects):
                 if index == 0:
