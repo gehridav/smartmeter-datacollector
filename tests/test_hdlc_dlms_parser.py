@@ -104,8 +104,8 @@ class TestDlmsParserUnencrypted:
         assert len(meter_data) == 1
         assert any(data.type == MeterDataPointTypes.WATER.value for data in meter_data)
         assert all(isinstance(data.value, float) for data in meter_data)
+        assert any(data.value == 180.463 for data in meter_data)
         assert all(data.source == "21538333" for data in meter_data)
-        #assert all(data.timestamp.strftime(r"%m/%d/%y %H:%M:%S") == "28/10/22 19:25:59" for data in meter_data)
 
     def test_parse_not_parsable_data_to_meter_data(self, invalid_hdlc_buffer: HdlcDlmsParser):
         dlms_objects = invalid_hdlc_buffer.parse_to_dlms_objects()

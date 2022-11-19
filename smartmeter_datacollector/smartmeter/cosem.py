@@ -49,8 +49,6 @@ class Cosem:
         self._id_detect_countdown = COSEM_OBJECT_DETECT_ATTEMPTS
 
     def retrieve_id(self, dlms_objects: Dict[str, Any]) -> str:
-        if self._id:
-            return self._id
 
         id_obis = self._find_id_obis(dlms_objects)
         if not id_obis:
@@ -59,11 +57,17 @@ class Cosem:
             return self._fallback_id
 
         id_obj = dlms_objects[id_obis]
+        
+        # External identifier from MBUS Client
+        if isinstance(id_obj, GXDLMSMBusClient):
+            meter_id = str(id_obj.getValues()[5])
+            if isinstance(meter_id, str) and len(meter_id) > 0:
+                return meter_id
+
+        if self._id:
+            return self._id
 
         if not isinstance(id_obj, GXDLMSData):
-            if isinstance(id_obj, GXDLMSMBusClient):
-                meter_id = str(id_obj.getValues()[5])
-            else:
                 LOGGER.debug("Invalid ID object for OBIS code %s. Using fallback ID %s.", id_obis, self._fallback_id)
                 self._trigger_id_detect_counter()
                 return self._fallback_id
