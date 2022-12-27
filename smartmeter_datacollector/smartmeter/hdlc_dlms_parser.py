@@ -111,6 +111,10 @@ class HdlcDlmsParser:
                 o[1].getObjectType() == ObjectType.EXTENDED_REGISTER), dlms_objects.items()):
             reg_type = self._cosem.get_register(obis)
             if reg_type and (isinstance(obj, (GXDLMSRegister, GXDLMSExtendedRegister))):
+
+                if (isinstance(obj, (GXDLMSExtendedRegister))):
+                    meter_id = self._cosem.retrieve_external_id(dlms_objects)
+
                 raw_value = self._extract_register_value(obj)
                 if raw_value is None:
                     LOGGER.warning("No value received for %s.", obis)
