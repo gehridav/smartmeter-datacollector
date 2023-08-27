@@ -18,6 +18,7 @@ def cosem_config_lg() -> Cosem:
     obis_registers = [
         RegisterCosem("1.0.1.7.0.255", MeterDataPointTypes.ACTIVE_POWER_P.value),
         RegisterCosem("1.0.2.7.0.255", MeterDataPointTypes.ACTIVE_POWER_N.value),
+        RegisterCosem("0.1.24.2.1.255", MeterDataPointTypes.WATER.value),
     ]
     return Cosem(
         fallback_id="fallback_id",
@@ -37,6 +38,14 @@ def unencrypted_valid_data_lg() -> List[bytes]:
     data = list(map(lambda frag: bytes.fromhex(frag.replace(" ", "")), data_str))
     return data
 
+@pytest.fixture
+def unencrypted_valid_data_extended_register_lg() -> List[bytes]:
+    data_str: List[str] = []
+    data_str.append("7E A0 83 CF 03 13 3F 65 E6 E7 00 E0 40 00 01 00 00 70 0F 00 08 A6 2F 0C 07 E6 0A 13 03 0B 00 00 FF 80 00 00 02 0E 01 0E 02 04 12 00 28 09 06 00 0B 19 09 00 FF 0F 02 12 00 00 02 04 12 00 28 09 06 00 0B 19 09 00 FF 0F 01 12 00 00 02 04 12 00 48 09 06 00 01 18 01 00 FF 0F 06 12 00 00 02 04 12 00 48 09 06 00 02 18 01 00 FF 0F 06 12 00 00 02 04 12 00 48 09 06 00 03 18 01 00 FF 0F 06 12 00 00 BA 2E 7E")
+    data_str.append("7E A0 7C CF 03 13 ED A0 E0 40 00 02 00 00 6C 02 04 12 00 04 09 06 00 01 18 02 01 FF 0F 02 12 00 00 02 04 12 00 04 09 06 00 02 18 02 01 FF 0F 02 12 00 00 02 04 12 00 04 09 06 00 03 18 02 01 FF 0F 02 12 00 00 02 04 12 00 48 09 06 00 01 18 01 00 FF 0F 09 12 00 00 02 04 12 00 48 09 06 00 02 18 01 00 FF 0F 09 12 00 00 02 04 12 00 48 09 06 00 03 18 01 00 FF 0F 09 12 00 00 D8 C3 7E") 
+    data_str.append("7E A0 84 CF 03 13 1E 32 E0 C0 00 03 00 00 74 02 04 12 00 04 09 06 00 01 18 02 01 FF 0F 03 12 00 00 02 04 12 00 04 09 06 00 02 18 02 01 FF 0F 03 12 00 00 02 04 12 00 04 09 06 00 03 18 02 01 FF 0F 03 12 00 00 09 06 00 0B 19 09 00 FF 06 01 48 A6 1D 06 00 00 00 00 06 00 00 00 00 06 00 02 C0 EF 06 00 00 00 00 06 00 00 00 00 11 07 11 00 11 00 02 02 0F FD 16 0E 02 02 0F 00 16 0E 02 02 0F FE 16 0E 96 96 7E")
+    data = list(map(lambda frag: bytes.fromhex(frag.replace(" ", "")), data_str))
+    return data
 
 @pytest.fixture
 def unencrypted_invalid_data_lg() -> List[bytes]:

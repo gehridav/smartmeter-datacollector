@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from gurux_dlms import GXByteBuffer, GXDLMSClient, GXReplyData
 from gurux_dlms.enums import InterfaceType, ObjectType, Security
-from gurux_dlms.objects import GXDLMSData, GXDLMSObject, GXDLMSRegister
+from gurux_dlms.objects import GXDLMSData, GXDLMSExtendedRegister, GXDLMSObject, GXDLMSRegister
 from gurux_dlms.secure import GXDLMSSecureClient
 
 from .cosem import Cosem
@@ -82,12 +82,22 @@ class HdlcDlmsParser:
         if isinstance(self._dlms_data.value, list):
             #pylint: disable=unsubscriptable-object
             parsed_objects = self._client.parsePushObjects(self._dlms_data.value[0])
+            value_objects = {}
             for index, (obj, attr_ind) in enumerate(parsed_objects):
                 if index == 0:
                     # Skip first (meta-data) object
                     continue
+                if attr_ind == 2:
+                    # Temp store and skip values for now, so that scaling is defined before setting the value
+                    value_objects[index] = obj
+                    continue
                 self._client.updateValue(obj, attr_ind, self._dlms_data.value[index])
                 LOGGER.debug("%s %s %s: %s", obj.objectType, obj.logicalName, attr_ind, obj.getValues()[attr_ind - 1])
+
+            for index, value_object in value_objects.items():
+                # Set values
+                self._client.updateValue(value_object,2, self._dlms_data.value[index])
+                LOGGER.debug("%s %s %s: %s", value_object.objectType, value_object.logicalName, 2, value_object.getValues()[1])
         self._dlms_data.clear()
         return {obj.getName(): obj for obj, _ in parsed_objects}
 
@@ -97,9 +107,14 @@ class HdlcDlmsParser:
 
         # Extract register data
         data_points: List[MeterDataPoint] = []
-        for obis, obj in filter(lambda o: o[1].getObjectType() == ObjectType.REGISTER, dlms_objects.items()):
+        for obis, obj in filter(lambda o: (o[1].getObjectType() == ObjectType.REGISTER) or (
+                o[1].getObjectType() == ObjectType.EXTENDED_REGISTER), dlms_objects.items()):
             reg_type = self._cosem.get_register(obis)
-            if reg_type and isinstance(obj, GXDLMSRegister):
+            if reg_type and (isinstance(obj, (GXDLMSRegister, GXDLMSExtendedRegister))):
+
+                if (isinstance(obj, (GXDLMSExtendedRegister))):
+                    meter_id = self._cosem.retrieve_external_id(dlms_objects)
+
                 raw_value = self._extract_register_value(obj)
                 if raw_value is None:
                     LOGGER.warning("No value received for %s.", obis)
