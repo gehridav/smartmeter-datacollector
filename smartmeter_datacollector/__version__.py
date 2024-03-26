@@ -5,4 +5,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # See LICENSES/README.md for more information.
 #
-__version__ = "1.1.0-pre"
+__version__ = "1.1.0"

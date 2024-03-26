@@ -6,15 +6,18 @@
 # See LICENSES/README.md for more information.
 #
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from gurux_dlms import GXByteBuffer, GXDLMSClient, GXReplyData
+from gurux_dlms import GXByteBuffer, GXDateTime, GXDLMSClient, GXReplyData
 from gurux_dlms.enums import InterfaceType, ObjectType, Security
-from gurux_dlms.objects import GXDLMSData, GXDLMSExtendedRegister, GXDLMSObject, GXDLMSRegister
+from gurux_dlms.objects import (GXDLMSCaptureObject, GXDLMSClock, GXDLMSData, GXDLMSObject, GXDLMSPushSetup,
+                                GXDLMSRegister, GXDLMSExtendedRegister)
 from gurux_dlms.secure import GXDLMSSecureClient
 
 from .cosem import Cosem
 from .meter_data import MeterDataPoint
+from .obis import OBISCode
 
 LOGGER = logging.getLogger("smartmeter")
 
@@ -22,7 +25,7 @@ LOGGER = logging.getLogger("smartmeter")
 class HdlcDlmsParser:
     HDLC_BUFFER_MAX_SIZE = 5000
 
-    def __init__(self, cosem_config: Cosem, block_cipher_key: Optional[str] = None) -> None:
+    def __init__(self, cosem: Cosem, block_cipher_key: Optional[str] = None, use_system_time: bool = False) -> None:
         if block_cipher_key:
             self._client = GXDLMSSecureClient(
                 useLogicalNameReferencing=True,
@@ -36,7 +39,10 @@ class HdlcDlmsParser:
 
         self._hdlc_buffer = GXByteBuffer()
         self._dlms_data = GXReplyData()
-        self._cosem = cosem_config
+        self._cosem = cosem
+        self._use_system_time = use_system_time
+        if use_system_time:
+            LOGGER.info("Use system UTC time instead of time in DLMS messages for this smart meter.")
 
     def append_to_hdlc_buffer(self, data: bytes) -> None:
         if self._hdlc_buffer.getSize() > self.HDLC_BUFFER_MAX_SIZE:
@@ -77,7 +83,7 @@ class HdlcDlmsParser:
         self._hdlc_buffer.clear()
         return True
 
-    def parse_to_dlms_objects(self) -> Dict[str, GXDLMSObject]:
+    def parse_to_dlms_objects_orig(self) -> Dict[str, GXDLMSObject]:
         parsed_objects: List[Tuple[GXDLMSObject, int]] = []
         if isinstance(self._dlms_data.value, list):
             #pylint: disable=unsubscriptable-object
@@ -100,20 +106,71 @@ class HdlcDlmsParser:
                 LOGGER.debug("%s %s %s: %s", value_object.objectType, value_object.logicalName, 2, value_object.getValues()[1])
         self._dlms_data.clear()
         return {obj.getName(): obj for obj, _ in parsed_objects}
+    
+    def extract_message_time(self) -> Optional[datetime]:
+        if not isinstance(self._dlms_data.time, GXDateTime):
+            return None
+        if isinstance(self._dlms_data.time.value, datetime):
+            return self._dlms_data.time.value
+        return None
 
-    def convert_dlms_bundle_to_reader_data(self, dlms_objects: Dict[str, GXDLMSObject]) -> List[MeterDataPoint]:
-        meter_id = self._cosem.retrieve_id(dlms_objects)
-        timestamp = self._cosem.retrieve_timestamp(dlms_objects)
+    def parse_to_dlms_objects(self) -> List[GXDLMSObject]:
+        if not isinstance(self._dlms_data.value, list) or not self._dlms_data.value:
+            self._dlms_data.clear()
+            LOGGER.error("DLMS data is no list or empty list. Not parsable.")
+            return []
+
+        # pylint: disable=unsubscriptable-object
+        if isinstance(self._dlms_data.value[0], list):
+            # message with included push-object-list as first object
+            dlms_objects = self._parse_dlms_with_push_object_list()
+        else:
+            # message without push-object-list
+            dlms_objects = self._parse_dlms_without_push_list()
+            if not dlms_objects:
+                # message contains no OBIS codes, only values, which is not supported.
+                LOGGER.warning("DLMS message is formatted in unknown structure and cannot be parsed by this software.")
+        self._dlms_data.clear()
+        return dlms_objects
+
+    def convert_dlms_bundle_to_reader_data(self, dlms_objects: List[GXDLMSObject],
+                                           message_time: Optional[datetime] = None) -> List[MeterDataPoint]:
+        obis_obj_pairs = {}
+        for obj in dlms_objects:
+            try:
+                obis_obj_pairs[OBISCode.from_string(str(obj.logicalName))] = obj
+            except ValueError as ex:
+                LOGGER.warning("Skipping unparsable DLMS object. (Reason: %s)", ex)
+
+        meter_id = self._cosem.retrieve_id(obis_obj_pairs)
+
+        timestamp = None
+        if self._use_system_time:
+            timestamp = datetime.utcnow()
+
+        if not timestamp:
+            timestamp = self._cosem.retrieve_time_from_dlms_registers(obis_obj_pairs)
+        if not timestamp:
+            timestamp = message_time
+        if not timestamp:
+            LOGGER.warning("Unable to get timestamp from message. Falling back to system time.")
+            self._use_system_time = True
+            timestamp = datetime.utcnow()
+
+        if not timestamp.tzinfo:
+            # if timezone info not set, assume UTC
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
 
         # Extract register data
         data_points: List[MeterDataPoint] = []
-        for obis, obj in filter(lambda o: (o[1].getObjectType() == ObjectType.REGISTER) or (
-                o[1].getObjectType() == ObjectType.EXTENDED_REGISTER), dlms_objects.items()):
+
+        for obis, obj in filter(lambda o: (o[1].getObjectType() == ObjectType.REGISTER) or 
+                (o[1].getObjectType() == ObjectType.EXTENDED_REGISTER), obis_obj_pairs.items()):
             reg_type = self._cosem.get_register(obis)
             if reg_type and (isinstance(obj, (GXDLMSRegister, GXDLMSExtendedRegister))):
 
                 if (isinstance(obj, (GXDLMSExtendedRegister))):
-                    meter_id = self._cosem.retrieve_external_id(dlms_objects)
+                    meter_id = self._cosem.retrieve_external_id(obis_obj_pairs)
 
                 raw_value = self._extract_register_value(obj)
                 if raw_value is None:
@@ -128,6 +185,53 @@ class HdlcDlmsParser:
                 data_points.append(MeterDataPoint(data_point_type, value, meter_id, timestamp))
         return data_points
 
+    def _parse_dlms_with_push_object_list(self) -> List[GXDLMSObject]:
+        parsed_objects: List[Tuple[GXDLMSObject, int]] = []
+        parsed_objects = self._client.parsePushObjects(self._dlms_data.value[0])
+        value_objects = {}
+        for index, (obj, attr_ind) in enumerate(parsed_objects[1:], start=1):
+            if attr_ind == 2:
+                # Temp store and skip values for now, so that scaling is defined before setting the value
+                value_objects[index] = obj
+                continue
+            
+            self._client.updateValue(obj, attr_ind, self._dlms_data.value[index])
+            LOGGER.debug("%s %s %s: %s", obj.objectType, obj.logicalName, attr_ind, obj.getValues()[attr_ind - 1])
+        
+        for index, value_object in value_objects.items():
+            # Set values
+            self._client.updateValue(value_object,2, self._dlms_data.value[index])
+            LOGGER.debug("%s %s %s: %s", value_object.objectType, value_object.logicalName, 2, value_object.getValues()[1])       
+            
+        return [obj for obj, _ in parsed_objects]
+
+    def _parse_dlms_without_push_list(self) -> List[GXDLMSObject]:
+        """Tries to extract OBIS codes and values from message.
+        Supported message format:
+            - timestamp
+            - obis code 1
+            - value 1
+            - obis code 2
+            - value 2
+            - ...
+        """
+        obis_codes, values = HdlcDlmsParser.extract_obis_and_values(self._dlms_data.value)
+        if not obis_codes:
+            return []
+
+        push_setup = GXDLMSPushSetup()
+        for obis in obis_codes:
+            if obis == Cosem.CLOCK_DEFAULT_OBIS:
+                push_setup.pushObjectList.append((GXDLMSClock(), GXDLMSCaptureObject(2, 0)))
+            else:
+                push_setup.pushObjectList.append((GXDLMSRegister(obis.to_gurux_str()), GXDLMSCaptureObject(2, 0)))
+
+        for index, (obj, attr_ind) in enumerate(push_setup.pushObjectList):
+            self._client.updateValue(obj, attr_ind.attributeIndex, values[index])
+            LOGGER.debug("%d %s %s %s: %s", index, obj.objectType, obj.logicalName,
+                         attr_ind.attributeIndex, obj.getValues()[attr_ind.attributeIndex - 1])
+        return [obj for obj, _ in push_setup.pushObjectList]
+
     @staticmethod
     def _extract_value_from_data_object(data_object: GXDLMSData) -> Optional[Any]:
         return data_object.getValues()[1]
@@ -135,3 +239,25 @@ class HdlcDlmsParser:
     @staticmethod
     def _extract_register_value(register: GXDLMSRegister) -> Optional[Any]:
         return register.getValues()[1]
+
+    @staticmethod
+    def extract_obis_and_values(data: List[Any]) -> Tuple[List[OBISCode], List[Any]]:
+        obis_it = filter(lambda d: isinstance(d[1], (bytearray, bytes)) and OBISCode.is_obis(d[1]), enumerate(data))
+
+        obis_codes = []
+        values = []
+
+        for idx, obis_bytes in obis_it:
+            if idx + 1 < len(data) and HdlcDlmsParser.is_value(data[idx + 1]):
+                obis_codes.append(OBISCode.from_bytes(obis_bytes))
+                values.append(data[idx + 1])
+            else:
+                LOGGER.debug("Skipped OBIS code without subsequent value.")
+
+        return obis_codes, values
+
+    @staticmethod
+    def is_value(data: Any) -> bool:
+        return (
+            isinstance(data, (int, str)) or
+            (isinstance(data, (bytearray, bytes)) and not OBISCode.is_obis(data)))

@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2022 Supercomputing Systems AG
+# Copyright (C) 2023 Supercomputing Systems AG
 # This file is part of smartmeter-datacollector.
 #
 # SPDX-License-Identifier: GPL-2.0-only
@@ -10,24 +10,15 @@ from typing import Optional
 
 import serial
 
-from .cosem import Cosem, RegisterCosem
+from .cosem import Cosem
 from .meter import MeterError, SerialHdlcDlmsMeter
-from .meter_data import MeterDataPointTypes
-from .obis import OBISCode
 from .reader import ReaderError
 from .serial_reader import SerialConfig
 
 LOGGER = logging.getLogger("smartmeter")
 
-EXTENDED_REGISTER_MAPPING = [
-    RegisterCosem(OBISCode(0, 1, 24, 2, 1), MeterDataPointTypes.WATER.value)
-]
 
-EXTENDED_REGISTER_IDS = [
-    OBISCode(0, 1, 24, 1, 0)
-]
-
-class LGE450(SerialHdlcDlmsMeter):
+class KamstrupHAN(SerialHdlcDlmsMeter):
     BAUDRATE = 2400
 
     def __init__(self, port: str,
@@ -38,15 +29,15 @@ class LGE450(SerialHdlcDlmsMeter):
             port=port,
             baudrate=baudrate,
             data_bits=serial.EIGHTBITS,
-            parity=serial.PARITY_EVEN,
+            parity=serial.PARITY_NONE,
             stop_bits=serial.STOPBITS_ONE,
             termination=SerialHdlcDlmsMeter.HDLC_FLAG
         )
-        cosem = Cosem(fallback_id=port, id_obis_override=EXTENDED_REGISTER_IDS, register_obis_extended=EXTENDED_REGISTER_MAPPING)
+        cosem = Cosem(fallback_id=port)
         try:
             super().__init__(serial_config, cosem, decryption_key, use_system_time)
         except ReaderError as ex:
-            LOGGER.fatal("Unable to setup serial reader for L+G E450. '%s'", ex)
-            raise MeterError("Failed setting up L+G E450.") from ex
+            LOGGER.fatal("Unable to setup serial reader for Kamstrup HAN. '%s'", ex)
+            raise MeterError("Failed setting up Kamstrup HAN.") from ex
 
-        LOGGER.info("Successfully set up L+G E450 smart meter on '%s'.", port)
+        LOGGER.info("Successfully set up Kamstrup HAN smart meter on '%s'.", port)
