@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2022 Supercomputing Systems AG
+# Copyright (C) 2024 Supercomputing Systems AG
 # This file is part of smartmeter-datacollector.
 #
 # SPDX-License-Identifier: GPL-2.0-only
@@ -18,6 +18,7 @@ from .smartmeter.iskraam550 import IskraAM550
 from .smartmeter.kamstrup_han import KamstrupHAN
 from .smartmeter.lge360 import LGE360
 from .smartmeter.lge450 import LGE450
+from .smartmeter.lge570 import LGE570
 from .smartmeter.meter import Meter, MeterError
 
 
@@ -31,6 +32,13 @@ def build_meters(config: ConfigParser) -> List[Meter]:
                 meters.append(LGE450(
                     port=meter_config.get('port', "/dev/ttyUSB0"),
                     baudrate=meter_config.getint('baudrate', LGE450.BAUDRATE),
+                    decryption_key=meter_config.get('key'),
+                    use_system_time=meter_config.getboolean('systemtime', False)
+                ))
+            elif meter_type == "lge570":
+                meters.append(LGE570(
+                    port=meter_config.get('port', "/dev/ttyUSB0"),
+                    baudrate=meter_config.getint('baudrate', LGE570.BAUDRATE),
                     decryption_key=meter_config.get('key'),
                     use_system_time=meter_config.getboolean('systemtime', False)
                 ))

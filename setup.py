@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Copyright (C) 2022 Supercomputing Systems AG
+# Copyright (C) 2024 Supercomputing Systems AG
 # This file is part of smartmeter-datacollector.
 #
 # SPDX-License-Identifier: GPL-2.0-only
@@ -39,22 +39,21 @@ setup(
         "Development Status :: 5 - Production/Stable",
         "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
         "Programming Language :: Python",
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Typing :: Typed",
     ],
     license="GPLv2",
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     packages=find_packages(
         exclude=["contrib", "doc", "LICENSES", "scripts", "tests", "tests."]
     ),
     include_package_data=True,
     install_requires=[
         'aioserial==1.3.1',
-        'asyncio-mqtt==0.16.1',
-        'gurux-dlms==1.0.143',
+        'asyncio-mqtt==0.16.2',
+        'gurux-dlms==1.0.150',
         'paho-mqtt==1.6.1',
         'pyserial==3.5'
     ],

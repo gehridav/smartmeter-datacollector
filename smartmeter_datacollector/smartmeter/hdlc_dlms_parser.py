@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2022 Supercomputing Systems AG
+# Copyright (C) 2024 Supercomputing Systems AG
 # This file is part of smartmeter-datacollector.
 #
 # SPDX-License-Identifier: GPL-2.0-only
@@ -146,7 +146,7 @@ class HdlcDlmsParser:
 
         timestamp = None
         if self._use_system_time:
-            timestamp = datetime.utcnow()
+            timestamp = datetime.now(timezone.utc)
 
         if not timestamp:
             timestamp = self._cosem.retrieve_time_from_dlms_registers(obis_obj_pairs)
@@ -155,7 +155,7 @@ class HdlcDlmsParser:
         if not timestamp:
             LOGGER.warning("Unable to get timestamp from message. Falling back to system time.")
             self._use_system_time = True
-            timestamp = datetime.utcnow()
+            timestamp = datetime.now(timezone.utc)
 
         if not timestamp.tzinfo:
             # if timezone info not set, assume UTC

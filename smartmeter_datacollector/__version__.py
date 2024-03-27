@@ -1,8 +1,8 @@
 #
-# Copyright (C) 2022 Supercomputing Systems AG
+# Copyright (C) 2024 Supercomputing Systems AG
 # This file is part of smartmeter-datacollector.
 #
 # SPDX-License-Identifier: GPL-2.0-only
 # See LICENSES/README.md for more information.
 #
-__version__ = "1.1.0"
+__version__ = "1.2.0"

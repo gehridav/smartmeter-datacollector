@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2022 Supercomputing Systems AG
+# Copyright (C) 2024 Supercomputing Systems AG
 # This file is part of smartmeter-datacollector.
 #
 # SPDX-License-Identifier: GPL-2.0-only
@@ -57,7 +57,9 @@ class SerialHdlcDlmsMeter(Meter):
 
         self._parser.append_to_hdlc_buffer(received_data)
         if self._parser.extract_data_from_hdlc_frames():
-            message_time = self._parser.extract_message_time()
             dlms_objects = self._parser.parse_to_dlms_objects()
+            if not dlms_objects:
+                return
+            message_time = self._parser.extract_message_time()
             data_points = self._parser.convert_dlms_bundle_to_reader_data(dlms_objects, message_time)
             self._notify_observers(data_points)

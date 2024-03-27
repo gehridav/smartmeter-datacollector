@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2022 Supercomputing Systems AG
+# Copyright (C) 2024 Supercomputing Systems AG
 # This file is part of smartmeter-datacollector.
 #
 # SPDX-License-Identifier: GPL-2.0-only
@@ -7,7 +7,7 @@
 #
 import asyncio
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 from pytest_mock import MockerFixture
@@ -22,12 +22,11 @@ def test_type() -> MeterDataPointType:
     return MeterDataPointType("TEST_TYPE", "test type", "unit")
 
 
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="Python3.7 does not support AsyncMock.")
 @pytest.mark.asyncio
 async def test_collector_with_one_sink(mocker: MockerFixture, test_type: MeterDataPointType):
     coll = Collector()
     sink = mocker.AsyncMock(DataSink)
-    data_point = MeterDataPoint(test_type, 0.0, "test_source", datetime.utcnow())
+    data_point = MeterDataPoint(test_type, 0.0, "test_source", datetime.now(timezone.utc))
 
     coll.register_sink(sink)
     coll.notify([data_point])
@@ -39,15 +38,14 @@ async def test_collector_with_one_sink(mocker: MockerFixture, test_type: MeterDa
     sink.send.assert_awaited_once_with(data_point)
 
 
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="Python3.7 does not support AsyncMock.")
 @pytest.mark.asyncio
 async def test_collector_with_one_sink_multiple_data_points(mocker: MockerFixture, test_type: MeterDataPointType):
     coll = Collector()
     sink = mocker.AsyncMock(DataSink)
 
     coll.register_sink(sink)
-    point0 = MeterDataPoint(test_type, 0.0, "test_source", datetime.utcnow())
-    point1 = MeterDataPoint(test_type, 1.0, "test_source", datetime.utcnow())
+    point0 = MeterDataPoint(test_type, 0.0, "test_source", datetime.now(timezone.utc))
+    point1 = MeterDataPoint(test_type, 1.0, "test_source", datetime.now(timezone.utc))
     coll.notify([point0, point1])
     routine = coll.process_queue()
 
@@ -58,14 +56,13 @@ async def test_collector_with_one_sink_multiple_data_points(mocker: MockerFixtur
     assert sink.send.await_count == 2
 
 
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="Python3.7 does not support AsyncMock.")
 @pytest.mark.asyncio
 async def test_collector_with_two_sinks(mocker: MockerFixture, test_type: MeterDataPointType):
     coll = Collector()
     sink0 = mocker.AsyncMock(DataSink)
     sink1 = mocker.AsyncMock(DataSink)
 
-    data_point = MeterDataPoint(test_type, 0.0, "test_source", datetime.utcnow())
+    data_point = MeterDataPoint(test_type, 0.0, "test_source", datetime.now(timezone.utc))
 
     coll.register_sink(sink0)
     coll.register_sink(sink1)

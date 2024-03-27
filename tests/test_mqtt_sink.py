@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2022 Supercomputing Systems AG
+# Copyright (C) 2024 Supercomputing Systems AG
 # This file is part of smartmeter-datacollector.
 #
 # SPDX-License-Identifier: GPL-2.0-only
@@ -8,7 +8,7 @@
 import configparser
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest import mock
 
 import pytest
@@ -22,7 +22,6 @@ from smartmeter_datacollector.smartmeter.meter_data import MeterDataPoint, Meter
 TEST_TYPE = MeterDataPointType("TEST_TYPE", "test type", "unit")
 
 
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="Python3.7 does not support AsyncMock.")
 @pytest.mark.asyncio
 async def test_mqtt_sink_start_stop(mocker: MockerFixture):
     config = MqttConfig("localhost")
@@ -36,13 +35,12 @@ async def test_mqtt_sink_start_stop(mocker: MockerFixture):
     client_mock.disconnect.assert_awaited_once()
 
 
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="Python3.7 does not support AsyncMock.")
 @pytest.mark.asyncio
 async def test_mqtt_sink_send_point_when_started(mocker: MockerFixture):
     config = MqttConfig("localhost")
     sink = MqttDataSink(config)
     client_mock = mocker.patch.object(sink, "_client", autospec=True)
-    data_point = MeterDataPoint(TEST_TYPE, 1.0, "test_source", datetime.utcnow())
+    data_point = MeterDataPoint(TEST_TYPE, 1.0, "test_source", datetime.now(timezone.utc))
     expected_topic = f"smartmeter/test_source/{TEST_TYPE.identifier}"
     expected_payload = json.dumps({
         "value": data_point.value,
@@ -55,13 +53,12 @@ async def test_mqtt_sink_send_point_when_started(mocker: MockerFixture):
     client_mock.publish.assert_awaited_once_with(expected_topic, expected_payload)
 
 
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="Python3.7 does not support AsyncMock.")
 @pytest.mark.asyncio
 async def test_mqtt_sink_send_reconnect_when_not_started(mocker: MockerFixture):
     config = MqttConfig("localhost")
     sink = MqttDataSink(config)
     client_mock = mocker.patch.object(sink, "_client", autospec=True)
-    data_point = MeterDataPoint(TEST_TYPE, 1.0, "test_source", datetime.utcnow())
+    data_point = MeterDataPoint(TEST_TYPE, 1.0, "test_source", datetime.now(timezone.utc))
 
     client_mock.publish.side_effect = MqttCodeError(MQTT_ERR_NO_CONN)
     await sink.send(data_point)
